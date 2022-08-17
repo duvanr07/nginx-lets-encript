@@ -1,0 +1,52 @@
+version: "3.1"
+services:
+  amqp:
+    build: .
+    image: talenta/amqp
+    container_name: "rabbit-mq"
+    restart: unless-stopped
+    expose:
+      - "15672"
+    ports:
+      - "5672:5672"
+      - "5671:5671"
+    environment:
+      - VIRTUAL_HOST=vendoguarapo.com
+      - VIRTUAL_PORT=15672
+      - LETSENCRYPT_HOST=vendoguarapo.com
+      - LETSENCRYPT_EMAIL=devops@talenta.cloud
+
+    volumes:
+      - "./dir:/var/lib/rabbitmq"
+      - "./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro"
+      - "./certs/vendoguarapo.com:/certs:ro"
+    depends_on:
+      - nginx-proxy
+      - letsencrypt
+
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    restart: unless-stopped
+    container_name: "nginx-proxy"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./vhostd:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: unless-stopped
+    container_name: "letsencrypt"
+    environment:
+      - NGINX_PROXY_CONTAINER=nginx-proxy
+    volumes:
+      - ./certs:/etc/nginx/certs:rw
+      - ./vhostd:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
